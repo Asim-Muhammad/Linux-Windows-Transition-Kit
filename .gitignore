@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C/C++ build artifacts
+*.o
+*.so
+*.out
+.vs/
+build/
+
+# OS generated files
+.DS_Store
+Thumbs.db
