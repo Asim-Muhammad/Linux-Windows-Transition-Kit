@@ -1,0 +1,11 @@
+Windows 10 File Explorer - Preview Pane
+=======================================
+
+Status: Active (Kernel-Wired Mode)
+Mount Monitor: /proc/self/mountinfo (QSocketNotifier)
+Inode Cache: 64-bit (st_dev, st_ino) fast lookup
+Idle CPU Usage: 0.0%
+
+Notes:
+- Single-clicking any text document (.txt, .md, .log, .json, .py, .sh, etc.) immediately previews its text contents right here in the right-hand Preview Pane.
+- Single-clicking any folder, drive, or empty space leaves the right-hand pane completely blank.

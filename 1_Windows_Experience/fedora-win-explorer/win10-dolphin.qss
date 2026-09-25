@@ -1,0 +1,285 @@
+/* ============================================================================
+ * Windows 10 File Explorer QSS Theme for KDE Dolphin (Qt6 / KF6)
+ * Authentic sharp edges, #F5F6F7 Ribbon bar, #0066B8 File tab, #CCE8FF selection
+ * ============================================================================ */
+
+/* 1. Main Window & Base Surface */
+QMainWindow, QWidget#DolphinMainWindow {
+    background-color: #FFFFFF;
+    color: #000000;
+    font-family: "Segoe UI", "Noto Sans", "Cantarell", sans-serif;
+    font-size: 9pt;
+}
+
+/* 2. Top Ribbon Tab Bar (MenuBar styled as Windows 10 File | Home | Share | View) */
+QMenuBar {
+    background-color: #FFFFFF;
+    border-bottom: 1px solid #DADADA;
+    padding: 0px;
+    spacing: 0px;
+    min-height: 24px;
+}
+
+QMenuBar::item {
+    background-color: transparent;
+    color: #1E1E1E;
+    padding: 4px 14px;
+    margin: 0px;
+    border: 1px solid transparent;
+    border-bottom: none;
+}
+
+/* Style the first item ("File") like Windows 10's signature Blue Application Button */
+QMenuBar::item:first {
+    background-color: #0066B8;
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 4px 18px;
+}
+
+QMenuBar::item:selected {
+    background-color: #F5F6F7;
+    color: #000000;
+    border-top: 1px solid #DADADA;
+    border-left: 1px solid #DADADA;
+    border-right: 1px solid #DADADA;
+}
+
+QMenuBar::item:first:selected {
+    background-color: #005A9E;
+    color: #FFFFFF;
+    border: none;
+}
+
+/* 3. Row 1: Windows 10 Ribbon Command Bar (Large Icons + Text Underneath) */
+QToolBar#mainToolBar {
+    background-color: #F5F6F7;
+    border-top: none;
+    border-bottom: 1px solid #D2D2D2;
+    padding: 4px 6px 5px 6px;
+    spacing: 2px;
+    min-height: 66px;
+}
+
+QToolBar#mainToolBar QToolButton {
+    background-color: transparent;
+    color: #1A1A1A;
+    border: 1px solid transparent;
+    border-radius: 0px;
+    padding: 3px 4px;
+    margin: 0px 1px;
+    font-size: 8.5pt;
+    min-width: 56px;
+    min-height: 54px;
+}
+
+QToolBar#mainToolBar QToolButton:hover {
+    background-color: #E5F3FF;
+    border: 1px solid #99D1FF;
+}
+
+QToolBar#mainToolBar QToolButton:pressed,
+QToolBar#mainToolBar QToolButton:checked {
+    background-color: #CCE8FF;
+    border: 1px solid #66B8FF;
+}
+
+QToolBar#mainToolBar::separator {
+    background-color: #D5D5D5;
+    width: 1px;
+    margin: 4px 5px;
+}
+
+/* 4. Row 2: Windows 10 Navigation & Address Bar (Back, Forward, Up, URL Bar, Search) */
+QToolBar#navigationToolBar {
+    background-color: #FFFFFF;
+    border-top: none;
+    border-bottom: 1px solid #E1E1E1;
+    padding: 4px 6px;
+    spacing: 4px;
+    min-height: 34px;
+}
+
+QToolBar#navigationToolBar QToolButton {
+    background-color: transparent;
+    color: #333333;
+    border: 1px solid transparent;
+    border-radius: 0px;
+    padding: 3px;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+QToolBar#navigationToolBar QToolButton:hover {
+    background-color: #E5F3FF;
+    border: 1px solid #99D1FF;
+}
+
+QToolBar#navigationToolBar QToolButton:pressed {
+    background-color: #CCE8FF;
+    border: 1px solid #0078D7;
+}
+
+/* Address Bar / Breadcrumb Navigator & Search Box */
+KUrlNavigator, QLineEdit {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1px solid #D9D9D9;
+    border-radius: 0px;
+    padding: 2px 6px;
+    min-height: 22px;
+    selection-background-color: #0078D7;
+    selection-color: #FFFFFF;
+}
+
+KUrlNavigator:hover, QLineEdit:hover {
+    border: 1px solid #7A7A7A;
+}
+
+KUrlNavigator:focus, QLineEdit:focus {
+    border: 1px solid #0078D7;
+}
+
+/* 5. Left Sidebar ("Quick access / This PC") & Right Details Pane */
+QDockWidget {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: none;
+    titlebar-close-icon: none;
+    titlebar-normal-icon: none;
+}
+
+QDockWidget::title {
+    background-color: #FFFFFF;
+    color: #444444;
+    padding: 4px 8px;
+    border-bottom: 1px solid #F0F0F0;
+    font-weight: 600;
+}
+
+/* Splitter dividers between Sidebar, Main View, and Details Pane */
+QSplitter::handle, QMainWindow::separator {
+    background-color: #E5E5E5;
+    width: 1px;
+    height: 1px;
+}
+
+/* 6. Main File & Folder View + Places List View */
+QAbstractItemView, QListView, QTreeView, KItemListWidget {
+    background-color: #FFFFFF;
+    alternate-background-color: #FFFFFF;
+    color: #000000;
+    border: none;
+    outline: none;
+    selection-background-color: #CCE8FF;
+    selection-color: #000000;
+}
+
+QAbstractItemView::item, QListView::item, QTreeView::item {
+    border: 1px solid transparent;
+    border-radius: 0px;
+    padding: 3px 4px;
+    color: #000000;
+}
+
+QAbstractItemView::item:hover, QListView::item:hover, QTreeView::item:hover {
+    background-color: #E5F3FF;
+    border: 1px solid #E5F3FF;
+    color: #000000;
+}
+
+QAbstractItemView::item:selected, QListView::item:selected, QTreeView::item:selected {
+    background-color: #CCE8FF;
+    border: 1px solid #99D1FF;
+    color: #000000;
+}
+
+/* Column Headers in Details View */
+QHeaderView::section {
+    background-color: #FFFFFF;
+    color: #4C4C4C;
+    border: none;
+    border-right: 1px solid #E5E5E5;
+    border-bottom: 1px solid #E5E5E5;
+    padding: 4px 8px;
+    font-weight: normal;
+}
+
+QHeaderView::section:hover {
+    background-color: #E5F3FF;
+    color: #000000;
+}
+
+/* 7. Tab Bar (if multiple tabs are opened) */
+QTabBar::tab {
+    background-color: #F0F0F0;
+    color: #333333;
+    border: 1px solid #D9D9D9;
+    border-bottom: none;
+    padding: 4px 14px;
+    margin-right: 1px;
+    border-radius: 0px;
+}
+
+QTabBar::tab:selected {
+    background-color: #FFFFFF;
+    color: #000000;
+    border-top: 2px solid #0078D7;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #E5F3FF;
+}
+
+/* 8. Bottom Status Bar (Item count + View mode + Zoom slider) */
+QStatusBar, DolphinStatusBar {
+    background-color: #F5F6F7;
+    color: #333333;
+    border-top: 1px solid #E1E1E1;
+    min-height: 23px;
+}
+
+/* 9. Context Menus (Sharp Windows 10 Context Menu) */
+QMenu {
+    background-color: #F2F2F2;
+    color: #000000;
+    border: 1px solid #CCCCCC;
+    padding: 2px;
+}
+
+QMenu::item {
+    padding: 4px 28px 4px 24px;
+    border: 1px solid transparent;
+}
+
+QMenu::item:selected {
+    background-color: #91C9F7;
+    color: #000000;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: #D7D7D7;
+    margin: 3px 4px;
+}
+
+/* 10. Scrollbars (Clean flat Windows 10 scrollbar) */
+QScrollBar:vertical {
+    background: #F0F0F0;
+    width: 14px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: #CDCDCD;
+    min-height: 24px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #A6A6A6;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
