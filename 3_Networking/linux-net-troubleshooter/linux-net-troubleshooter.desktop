@@ -1,0 +1,22 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Network Troubleshooter & Reset
+GenericName=Network Diagnostic & Repair Tool
+Comment=Diagnose network issues, fix DNS/Gateway problems, and reset the network stack safely
+Exec=/home/user/.local/bin/linux-net-troubleshooter
+Icon=netdoctor
+Terminal=false
+Categories=Network;System;Settings;Utility;GTK;
+Keywords=network;internet;troubleshoot;diagnose;reset;dns;wifi;ethernet;ping;repair;
+StartupNotify=true
+StartupWMClass=linux-net-troubleshooter
+Actions=Diagnose;Reset;
+
+[Desktop Action Diagnose]
+Name=Run Network Diagnostics (Terminal)
+Exec=/home/user/.local/bin/linux-net-troubleshooter --cli
+
+[Desktop Action Reset]
+Name=Quick Network Reset
+Exec=bash -c "resolvectl flush-caches 2>/dev/null; ip neigh flush all 2>/dev/null; nmcli networking off && nmcli networking on 2>/dev/null"

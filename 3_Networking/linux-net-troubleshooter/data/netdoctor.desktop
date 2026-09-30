@@ -1,0 +1,22 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NetDoctor
+GenericName=Network Troubleshooter & Reset
+Comment=Automated 8-layer network diagnostics, DNS fixer, and safe network stack reset
+Exec=/home/user/.local/bin/netdoctor
+Icon=/home/user/.local/share/icons/hicolor/scalable/apps/netdoctor.svg
+Terminal=false
+Categories=Network;System;
+Keywords=network;internet;troubleshoot;diagnose;reset;dns;wifi;ethernet;ping;repair;
+StartupNotify=true
+StartupWMClass=netdoctor
+Actions=Diagnose;Reset;
+
+[Desktop Action Diagnose]
+Name=Run Network Diagnostics (CLI)
+Exec=/home/user/.local/bin/netdoctor --cli
+
+[Desktop Action Reset]
+Name=Quick Network Reset
+Exec=bash -c "resolvectl flush-caches 2>/dev/null; ip neigh flush all 2>/dev/null; nmcli networking off && nmcli networking on 2>/dev/null"

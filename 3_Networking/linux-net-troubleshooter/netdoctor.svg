@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0066cc"/>
+      <stop offset="50%" stop-color="#0052a3"/>
+      <stop offset="100%" stop-color="#003366"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="100%" stop-color="#0072ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Outer Shield Background -->
+  <path d="M64 8 C92 8, 116 16, 116 36 C116 78, 88 108, 64 120 C40 108, 12 78, 12 36 C12 16, 36 8, 64 8 Z" 
+        fill="url(#shieldGrad)" filter="url(#shadow)" stroke="#00d2ff" stroke-width="2.5"/>
+
+  <!-- Inner Globe Grid Lines -->
+  <circle cx="64" cy="56" r="32" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="2"/>
+  <ellipse cx="64" cy="56" rx="16" ry="32" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="1.5"/>
+  <line x1="32" y1="56" x2="96" y2="56" stroke="#ffffff" stroke-opacity="0.2" stroke-width="1.5"/>
+  <line x1="36" y1="44" x2="92" y2="44" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1.5"/>
+  <line x1="36" y1="68" x2="92" y2="68" stroke="#ffffff" stroke-opacity="0.15" stroke-width="1.5"/>
+
+  <!-- Pulse / Heartbeat Diagnostic Waveform -->
+  <polyline points="28,56 46,56 52,42 58,74 64,36 70,70 76,52 82,56 100,56" 
+            fill="none" stroke="#00ffcc" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Network Connection Nodes -->
+  <circle cx="52" cy="42" r="3.5" fill="#ffffff" stroke="#00d2ff" stroke-width="1.5"/>
+  <circle cx="64" cy="36" r="4" fill="#ffffff" stroke="#00ffcc" stroke-width="2"/>
+  <circle cx="76" cy="52" r="3.5" fill="#ffffff" stroke="#00d2ff" stroke-width="1.5"/>
+
+  <!-- Status Indicator Dot -->
+  <circle cx="64" cy="100" r="6" fill="#00ffcc" filter="url(#shadow)"/>
+  <circle cx="64" cy="100" r="3" fill="#ffffff"/>
+</svg>
