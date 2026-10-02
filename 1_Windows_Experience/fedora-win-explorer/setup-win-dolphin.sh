@@ -1754,18 +1754,6 @@ cat << EOF > "${PLACES_XBEL}"
    </metadata>
   </info>
  </bookmark>
- <bookmark href="file://${HOME}">
-  <title>$(whoami)</title>
-  <info>
-   <metadata owner="http://freedesktop.org">
-    <bookmark:icon name="user-home"/>
-   </metadata>
-   <metadata owner="http://www.kde.org">
-    <ID>1790184400/98</ID>
-    <isSystemItem>true</isSystemItem>
-   </metadata>
-  </info>
- </bookmark>
  <bookmark href="file://${HOME}/Desktop">
   <title>Desktop</title>
   <info>

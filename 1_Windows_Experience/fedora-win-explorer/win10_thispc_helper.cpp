@@ -1241,20 +1241,24 @@ static void ensureNavButtonsOnLeft() {
                 QListView* view = static_cast<QListView*>(w);
                 if (!view->property("win10PlacesSized").toBool()) {
                     view->setProperty("win10PlacesSized", true);
-                    view->setIconSize(QSize(24, 24));
-                    view->setGridSize(QSize(0, 36));
+                    view->setIconSize(QSize(20, 20));
                     view->setStyleSheet(
                         "QListView { font-size: 10pt; outline: none; }"
-                        "QListView::item { height: 36px; padding-left: 4px; padding-right: 4px; }"
+                        "QListView::item { padding-top: 4px; padding-bottom: 4px; padding-left: 4px; padding-right: 4px; }"
                         "QListView::item:selected { background: #cce8ff; color: #000000; border: none; }"
                         "QListView::item:hover { background: #e5f3ff; }"
                     );
                 }
                 if (view && view->model()) {
+                    static auto fn_setPlaceHidden = reinterpret_cast<void(*)(void*, const QModelIndex&, bool)>(
+                        dlsym(RTLD_DEFAULT, "_ZN16KFilePlacesModel14setPlaceHiddenERK11QModelIndexb"));
                     if (!view->property("win10PlacesModelHooked").toBool()) {
                         view->setProperty("win10PlacesModelHooked", true);
                         auto recheck = [view]() {
                             if (!view || !view->model()) return;
+                            static auto s_fn = reinterpret_cast<void(*)(void*, const QModelIndex&, bool)>(
+                                dlsym(RTLD_DEFAULT, "_ZN16KFilePlacesModel14setPlaceHiddenERK11QModelIndexb"));
+                            if (!s_fn) return;
                             int r = view->model()->rowCount();
                             for (int k = 0; k < r; ++k) {
                                 QModelIndex idx = view->model()->index(k, 0);
@@ -1266,8 +1270,13 @@ static void ensureNavButtonsOnLeft() {
                                     uStr.contains(QStringLiteral("recentlyused:"), Qt::CaseInsensitive) ||
                                     uStr.contains(QStringLiteral("timeline:"), Qt::CaseInsensitive) ||
                                     (label == QStringLiteral("Recent Files") && uStr.contains(QStringLiteral("recentlyused"), Qt::CaseInsensitive))) {
-                                    view->setRowHidden(k, true);
-                                    const_cast<QAbstractItemModel*>(view->model())->setData(idx, true, Qt::UserRole + 2);
+                                    void* targetModel = const_cast<QAbstractItemModel*>(view->model());
+                                    if (auto* proxy = qobject_cast<QAbstractProxyModel*>(view->model())) {
+                                        targetModel = proxy->sourceModel();
+                                        s_fn(targetModel, proxy->mapToSource(idx), true);
+                                    } else {
+                                        s_fn(targetModel, idx, true);
+                                    }
                                 }
                             }
                         };
@@ -1281,15 +1290,11 @@ static void ensureNavButtonsOnLeft() {
                         QString label = view->model()->data(idx, Qt::DisplayRole).toString().trimmed();
                         QVariant uVar = view->model()->data(idx, Qt::UserRole + 1);
                         QString uStr = uVar.toString();
-                        static auto fn_setPlaceHidden = reinterpret_cast<void(*)(void*, const QModelIndex&, bool)>(
-                            dlsym(RTLD_DEFAULT, "_ZN16KFilePlacesModel14setPlaceHiddenERK11QModelIndexb"));
                         if (label == QStringLiteral("Recent Locations") ||
                             label == QStringLiteral("Recent") ||
                             uStr.contains(QStringLiteral("recentlyused:"), Qt::CaseInsensitive) ||
                             uStr.contains(QStringLiteral("timeline:"), Qt::CaseInsensitive) ||
                             (label == QStringLiteral("Recent Files") && uStr.contains(QStringLiteral("recentlyused"), Qt::CaseInsensitive))) {
-                            view->setRowHidden(i, true);
-                            const_cast<QAbstractItemModel*>(view->model())->setData(idx, true, Qt::UserRole + 2);
                             if (fn_setPlaceHidden) {
                                 void* targetModel = const_cast<QAbstractItemModel*>(view->model());
                                 if (auto* proxy = qobject_cast<QAbstractProxyModel*>(view->model())) {
@@ -3315,7 +3320,7 @@ static QString toWinPath(const QString& linuxPath) {
         return QStringLiteral("D:\\");
     }
     if (p.startsWith(QDir::homePath() + QStringLiteral("/"))) {
-        p = QStringLiteral("D:") + p.mid(10);
+        p = QStringLiteral("D:") + p.mid(QDir::homePath().length());
     } else if (p == QStringLiteral("/")) {
         return QStringLiteral("C:\\");
     } else if (p.startsWith(QStringLiteral("/"))) {
