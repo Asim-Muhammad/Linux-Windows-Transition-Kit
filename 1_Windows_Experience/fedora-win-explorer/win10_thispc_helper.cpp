@@ -3896,14 +3896,31 @@ extern "C" void _ZN13QGraphicsItem6setPosERK7QPointF(void* item, const QPointF& 
         dlsym(RTLD_NEXT, "_ZN13QGraphicsItem6setPosERK7QPointF"));
     if (!real_setPos) return;
     if (item) {
-        void* widgetSelf = reinterpret_cast<char*>(item) - 16;
-        if (s_knownStandardWidgets.contains(widgetSelf)) {
-            QString driveName = getLiveWidgetDriveName(widgetSelf);
-            if (!driveName.isEmpty()) {
-                int driveIdx = getDriveIndexFromName(driveName);
-                QPointF shifted(16.0 + driveIdx * 288.0, pos.y());
-                real_setPos(item, shifted);
-                return;
+        static auto fn_toGraphicsObject = reinterpret_cast<QGraphicsObject*(*)(void*)>(
+            dlsym(RTLD_DEFAULT, "_ZN13QGraphicsItem16toGraphicsObjectEv"));
+        QGraphicsObject* gobj = fn_toGraphicsObject ? fn_toGraphicsObject(item) : nullptr;
+        if (!gobj) {
+            void* candidate = reinterpret_cast<char*>(item) - 16;
+            if (s_knownStandardWidgets.contains(candidate)) {
+                gobj = reinterpret_cast<QGraphicsObject*>(candidate);
+            }
+        }
+        if (gobj) {
+            const QMetaObject* mo = gobj->metaObject();
+            if (mo && strcmp(mo->className(), "KStandardItemListWidget") == 0) {
+                QString driveName = getLiveWidgetDriveName(gobj);
+                if (!driveName.isEmpty()) {
+                    s_knownStandardWidgets.insert(gobj);
+                    static auto real_resize = reinterpret_cast<void(*)(void*, const QSizeF&)>(
+                        dlsym(RTLD_NEXT, "_ZN15QGraphicsWidget6resizeERK6QSizeF"));
+                    if (real_resize) {
+                        real_resize(gobj, QSizeF(276.0, 82.0));
+                    }
+                    int driveIdx = getDriveIndexFromName(driveName);
+                    QPointF shifted(16.0 + driveIdx * 288.0, pos.y());
+                    real_setPos(item, shifted);
+                    return;
+                }
             }
         }
     }
@@ -3913,21 +3930,28 @@ extern "C" void _ZN13QGraphicsItem6setPosERK7QPointF(void* item, const QPointF& 
 static qreal syncDriveWidgetGeometry(const void* self, const QString& driveName) {
     if (!self || driveName.isEmpty()) return 0.0;
     s_knownStandardWidgets.insert(self);
-    static auto real_setPos = reinterpret_cast<void(*)(void*, const QPointF&)>(
-        dlsym(RTLD_NEXT, "_ZN13QGraphicsItem6setPosERK7QPointF"));
     static auto real_resize = reinterpret_cast<void(*)(void*, const QSizeF&)>(
         dlsym(RTLD_NEXT, "_ZN15QGraphicsWidget6resizeERK6QSizeF"));
     auto* gw = reinterpret_cast<QGraphicsWidget*>(const_cast<void*>(self));
-    if (gw->size().width() < 274.0 && real_resize) {
+    if (gw && gw->size().width() < 274.0 && real_resize) {
         real_resize(gw, QSizeF(276.0, 82.0));
     }
     int driveIdx = getDriveIndexFromName(driveName);
     qreal expectedX = 16.0 + driveIdx * 288.0;
-    qreal curX = gw->pos().x();
-    if (qAbs(curX - expectedX) > 1.5 && real_setPos) {
-        real_setPos(static_cast<QGraphicsItem*>(gw), QPointF(expectedX, gw->pos().y()));
+    qreal curX = gw ? gw->pos().x() : expectedX;
+    qreal dx = expectedX - curX;
+    if (qAbs(dx) > 1.5 && gw) {
+        QTimer::singleShot(0, gw, [gw, expectedX]() {
+            if (!gw) return;
+            static auto real_setPos = reinterpret_cast<void(*)(void*, const QPointF&)>(
+                dlsym(RTLD_NEXT, "_ZN13QGraphicsItem6setPosERK7QPointF"));
+            if (real_setPos) {
+                real_setPos(static_cast<QGraphicsItem*>(gw), QPointF(expectedX, gw->pos().y()));
+                gw->update();
+            }
+        });
     }
-    return 0.0;
+    return dx;
 }
 
 extern "C" QRectF _ZNK23KStandardItemListWidget17selectionRectCoreEv(const void* self) {
@@ -4002,16 +4026,16 @@ static void paintWin10DriveTile(const void* self, const QString& rawName, QPaint
     painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
     painter->setRenderHint(QPainter::TextAntialiasing, true);
 
-    // Tile bounding box (274px wide x 70px tall)
+    // Tile bounding box (274px wide x 70px tall with smooth 3px rounded corners)
     QRectF tileRect(0, 6, 274, 70);
     if (selected) {
         painter->setPen(QPen(QColor(153, 209, 255), 1));
         painter->setBrush(QColor(204, 232, 255));
-        painter->drawRect(tileRect);
+        painter->drawRoundedRect(tileRect, 3.0, 3.0);
     } else if (hovered) {
         painter->setPen(QPen(QColor(204, 232, 255), 1));
         painter->setBrush(QColor(229, 243, 255));
-        painter->drawRect(tileRect);
+        painter->drawRoundedRect(tileRect, 3.0, 3.0);
     }
 
     // 1. Left: Genuine 3D Silver Windows 10 Drive Icon (52x52 at x=6, y=15)
@@ -4031,33 +4055,35 @@ static void paintWin10DriveTile(const void* self, const QString& rawName, QPaint
 
     // 2. Right Row 1 (x=66, y=9): Drive Name ("Local Disk (C:)", "Local Disk (D:)", "USB Drive (E:)")
     QFont titleFont = painter->font();
-    titleFont.setPointSizeF(11.0);
+    titleFont.setPointSizeF(10.5);
     titleFont.setWeight(QFont::Normal);
     painter->setFont(titleFont);
-    painter->setPen(QColor(20, 20, 20));
-    painter->drawText(QRect(66, 9, 202, 22), Qt::AlignLeft | Qt::AlignVCenter, rawName);
+    painter->setPen(QColor(25, 25, 25));
+    painter->drawText(QRectF(66, 9, 202, 22), Qt::AlignLeft | Qt::AlignVCenter, rawName);
 
     // 3. Right Row 2 (x=66, y=33, width=196, height=16): Original Windows 10 Capacity Bar
-    QRect barOuter(66, 33, 196, 16);
-    painter->setPen(QPen(QColor(188, 188, 188), 1));
+    QRectF barOuter(66, 33, 196, 16);
+    painter->setPen(QPen(QColor(210, 210, 210), 1));
     painter->setBrush(QColor(230, 230, 230));
-    painter->drawRect(barOuter);
+    painter->drawRoundedRect(barOuter, 1.5, 1.5);
 
     int maxFillW = 194;
     int fillW = (sp.usedPct * maxFillW) / 100;
-    if (fillW < 8 && sp.usedPct > 0) fillW = 8;
+    if (fillW < 6 && sp.usedPct > 0) fillW = 6;
     if (fillW > maxFillW) fillW = maxFillW;
     if (fillW > 0) {
         QColor barColor = (sp.usedPct >= 90) ? QColor(218, 38, 38) : QColor(38, 160, 218);
-        painter->fillRect(QRect(67, 34, fillW, 14), barColor);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(barColor);
+        painter->drawRoundedRect(QRectF(67, 34, fillW, 14), 1.0, 1.0);
     }
 
-    // 4. Right Row 3 (x=66, y=52): "89.5 GB free of 98.0 GB" in crisp readable dark grey (#404040)
+    // 4. Right Row 3 (x=66, y=52): "89.5 GB free of 98.0 GB" in crisp readable dark grey (#464646)
     QFont subFont = painter->font();
-    subFont.setPointSizeF(10.0);
+    subFont.setPointSizeF(9.5);
     painter->setFont(subFont);
-    painter->setPen(QColor(64, 64, 64));
-    painter->drawText(QRect(66, 52, 202, 20), Qt::AlignLeft | Qt::AlignVCenter, sp.summaryText);
+    painter->setPen(QColor(70, 70, 70));
+    painter->drawText(QRectF(66, 52, 202, 20), Qt::AlignLeft | Qt::AlignVCenter, sp.summaryText);
 
     painter->restore();
 }

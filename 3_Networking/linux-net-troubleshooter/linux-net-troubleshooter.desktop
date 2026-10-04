@@ -10,7 +10,7 @@ Terminal=false
 Categories=Network;System;Settings;Utility;GTK;
 Keywords=network;internet;troubleshoot;diagnose;reset;dns;wifi;ethernet;ping;repair;
 StartupNotify=true
-StartupWMClass=linux-net-troubleshooter
+StartupWMClass=netdoctor
 Actions=Diagnose;Reset;
 
 [Desktop Action Diagnose]

@@ -30,7 +30,27 @@ def run_cli_diagnostics():
                 print(f"    Detail : {first_detail}")
         print("-" * 60)
 
+def ensure_mime_database():
+    """Ensures SVG MIME type is recognized by GIO/GdkPixbuf to prevent GTK icon helper assertions."""
+    try:
+        import gi
+        gi.require_version('Gio', '2.0')
+        from gi.repository import Gio
+        ctype, _ = Gio.content_type_guess("test.svg", None)
+        if ctype != "image/svg+xml":
+            local_mime = os.path.expanduser("~/.local/share/mime/packages")
+            os.makedirs(local_mime, exist_ok=True)
+            import subprocess
+            subprocess.run(
+                "cp /usr/share/mime/packages/*.xml ~/.local/share/mime/packages/ 2>/dev/null; update-mime-database ~/.local/share/mime 2>/dev/null",
+                shell=True, timeout=5
+            )
+    except Exception:
+        pass
+
+
 def main():
+    ensure_mime_database()
     if "--cli" in sys.argv or "--diagnose" in sys.argv or not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
         run_cli_diagnostics()
         return

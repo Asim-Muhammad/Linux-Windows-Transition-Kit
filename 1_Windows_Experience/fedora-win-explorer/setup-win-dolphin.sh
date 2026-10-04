@@ -321,6 +321,9 @@ rm -f "${HOME}/.local/share/icons/Win10-Explorer/scalable/places/w10drive_"*.svg
 # 2. Live Windows 10 cyan/red capacity progress bars + "XX.X GB free of YY.Y GB" labels on C:, D:, E:, etc.
 # 3. Live synchronization of root (/) into Drive_C and hot-plugged USB/external drives into This PC
 # 4. Dynamic mtime-aware 3D Windows 10 folder previews (empty -> paper sheets -> sideways-peeking image)
+if [ -f "${SCRIPT_DIR}/win10_thispc_helper.cpp" ]; then
+    cp "${SCRIPT_DIR}/win10_thispc_helper.cpp" "${CONFIG_DIR}/win10_thispc_helper.cpp"
+else
 cat << 'EOF' > "${CONFIG_DIR}/win10_thispc_helper.cpp"
 #include <QString>
 #include <QDir>
@@ -1463,6 +1466,7 @@ extern "C" QString _ZNK9KFileItem11mimeCommentEv(const KFileItem* self) {
     return real_fn ? real_fn(self) : QStringLiteral("Folder");
 }
 EOF
+fi
 g++ -shared -fPIC -O2 -I/usr/include/qt6 -I/usr/include/qt6/QtCore -I/usr/include/qt6/QtGui -I/usr/include/qt6/QtWidgets "${CONFIG_DIR}/win10_thispc_helper.cpp" -o "${CONFIG_DIR}/libwin10_thispc.so" -lQt6Widgets -lQt6Gui -lQt6Core -ldl
 
 # Configure ThisPC folder view properties (Grouped by Type, Folders First, No Previews, Icons Mode)

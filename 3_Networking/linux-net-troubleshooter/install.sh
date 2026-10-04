@@ -38,6 +38,13 @@ elif command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 2>/dev/null || true
 fi
 
+# 6. Ensure User MIME database is compiled for SVG icons
+if command -v update-mime-database >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/share/mime/packages"
+    cp /usr/share/mime/packages/*.xml "$HOME/.local/share/mime/packages/" 2>/dev/null || true
+    update-mime-database "$HOME/.local/share/mime" 2>/dev/null || true
+fi
+
 echo "✔ NetDoctor installed successfully!"
 echo "✔ Commands available: 'netdoctor' and 'linux-net-troubleshooter'"
 echo "✔ Desktop launcher: $HOME/.local/share/applications/netdoctor.desktop"

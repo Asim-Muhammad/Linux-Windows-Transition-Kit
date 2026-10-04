@@ -40,7 +40,10 @@ class NetDoctorApp(Gtk.Application):
                         pass
 
             self.window = NetDoctorWindow(application=self)
-            self.window.set_wmclass("netdoctor", "NetDoctor")
+            try:
+                self.window.set_wmclass("netdoctor", "NetDoctor")
+            except Exception:
+                pass
             self.window.connect("destroy", lambda w: setattr(self, "window", None))
 
         self.window.show_all()
@@ -64,13 +67,35 @@ def run_cli():
         print("-" * 64)
 
 
+def ensure_mime_database():
+    """Ensures SVG MIME type is recognized by GIO/GdkPixbuf to prevent GTK icon helper assertions."""
+    try:
+        ctype, _ = Gio.content_type_guess("test.svg", None)
+        if ctype != "image/svg+xml":
+            local_mime = os.path.expanduser("~/.local/share/mime/packages")
+            os.makedirs(local_mime, exist_ok=True)
+            import subprocess
+            subprocess.run(
+                "cp /usr/share/mime/packages/*.xml ~/.local/share/mime/packages/ 2>/dev/null; update-mime-database ~/.local/share/mime 2>/dev/null",
+                shell=True, timeout=5
+            )
+    except Exception:
+        pass
+
+
 def main():
+    ensure_mime_database()
     if "--cli" in sys.argv or "--diagnose" in sys.argv:
         run_cli()
         return 0
 
-    app = NetDoctorApp()
-    return app.run(sys.argv)
+    try:
+        app = NetDoctorApp()
+        return app.run(sys.argv)
+    except Exception as e:
+        print(f"Notice: NetDoctor GUI fallback: {e}", file=sys.stderr)
+        run_cli()
+        return 0
 
 
 if __name__ == "__main__":

@@ -19,6 +19,13 @@ from netdoctor.engine import NetworkEngine, DiagnosticResult
 from netdoctor.theme import get_theme_manager
 
 
+def esc(text) -> str:
+    """Safely escapes text for use in Pango markup."""
+    if text is None:
+        return ""
+    return GLib.markup_escape_text(str(text))
+
+
 class NetDoctorWindow(Gtk.ApplicationWindow):
     def __init__(self, application):
         super().__init__(application=application, title="NetDoctor — Network Troubleshooter & Reset")
@@ -145,43 +152,58 @@ class NetDoctorWindow(Gtk.ApplicationWindow):
         return vbox
 
     def on_run_diagnostics(self):
-        self.btn_run_diag.set_sensitive(False)
-        self.spinner.start()
-        self.diag_status_label.set_text("Analyzing 12 network layers...")
-        self.update_status_badge("Checking...", "nd-badge-info", "Running diagnostic probes...")
+        try:
+            self.btn_run_diag.set_sensitive(False)
+            self.spinner.start()
+            self.diag_status_label.set_text("Analyzing 12 network layers...")
+            self.update_status_badge("Checking...", "nd-badge-info", "Running diagnostic probes...")
 
-        for child in self.results_listbox.get_children():
-            self.results_listbox.remove(child)
+            for child in self.results_listbox.get_children():
+                self.results_listbox.remove(child)
 
-        def worker():
-            results = self.engine.run_full_diagnostics()
-            GLib.idle_add(self._on_diagnostics_complete, results)
+            def worker():
+                try:
+                    results = self.engine.run_full_diagnostics()
+                    GLib.idle_add(self._on_diagnostics_complete, results)
+                except Exception as e:
+                    print(f"Diagnostics worker exception: {e}", file=sys.stderr)
+                    GLib.idle_add(lambda: self.diag_status_label.set_text(f"Diagnostic error: {e}"))
+                    GLib.idle_add(lambda: self.spinner.stop())
+                    GLib.idle_add(lambda: self.btn_run_diag.set_sensitive(True))
 
-        threading.Thread(target=worker, daemon=True).start()
+            threading.Thread(target=worker, daemon=True).start()
+        except Exception as e:
+            print(f"Error starting diagnostics: {e}", file=sys.stderr)
+        return False
 
     def _on_diagnostics_complete(self, results):
-        self.btn_run_diag.set_sensitive(True)
-        self.spinner.stop()
+        try:
+            self.btn_run_diag.set_sensitive(True)
+            self.spinner.stop()
 
-        has_fail = any(r.status == "FAIL" for r in results)
-        has_warn = any(r.status == "WARN" for r in results)
+            has_fail = any(r.status == "FAIL" for r in results)
+            has_warn = any(r.status == "WARN" for r in results)
 
-        if not has_fail and not has_warn:
-            self.update_status_badge("🟢 Fully Operational", "nd-badge-success", "All 12 network layers passed! Internet active.")
-            self.diag_status_label.set_text("✔ All 12 network checks passed successfully!")
-        elif not has_fail and has_warn:
-            self.update_status_badge("🟡 Warning Detected", "nd-badge-warning", "Network active with performance notices (e.g. Wi-Fi PowerSave).")
-            self.diag_status_label.set_text("⚠ Network active with performance notices.")
-        else:
-            first_fail = next(r for r in results if r.status == "FAIL")
-            self.update_status_badge("🔴 Network Issue", "nd-badge-danger", f"Failure at: {first_fail.title}")
-            self.diag_status_label.set_text(f"✘ Issue: {first_fail.message}")
+            if not has_fail and not has_warn:
+                self.update_status_badge("🟢 Fully Operational", "nd-badge-success", "All 12 network layers passed! Internet active.")
+                self.diag_status_label.set_text("✔ All 12 network checks passed successfully!")
+            elif not has_fail and has_warn:
+                self.update_status_badge("🟡 Warning Detected", "nd-badge-warning", "Network active with performance notices (e.g. Wi-Fi PowerSave).")
+                self.diag_status_label.set_text("⚠ Network active with performance notices.")
+            else:
+                first_fail = next((r for r in results if r.status == "FAIL"), None)
+                if first_fail:
+                    self.update_status_badge("🔴 Network Issue", "nd-badge-danger", f"Failure at: {first_fail.title}")
+                    self.diag_status_label.set_text(f"✘ Issue: {first_fail.message}")
 
-        for res in results:
-            row = self._create_diag_row(res)
-            self.results_listbox.add(row)
+            for res in results:
+                row = self._create_diag_row(res)
+                self.results_listbox.add(row)
 
-        self.results_listbox.show_all()
+            self.results_listbox.show_all()
+        except Exception as e:
+            print(f"Error rendering diagnostics results: {e}", file=sys.stderr)
+        return False
 
     def _create_diag_row(self, res: DiagnosticResult):
         row = Gtk.ListBoxRow()
@@ -202,7 +224,7 @@ class NetDoctorWindow(Gtk.ApplicationWindow):
 
         title = Gtk.Label(xalign=0)
         title.get_style_context().add_class("nd-text-primary")
-        title.set_markup(f"<b>{res.title}</b>")
+        title.set_markup(f"<b>{esc(res.title)}</b>")
 
         badge = Gtk.Label(label=res.status)
         badge.get_style_context().add_class("nd-badge")
@@ -233,26 +255,29 @@ class NetDoctorWindow(Gtk.ApplicationWindow):
         return row
 
     def _handle_fix_action(self, fix_action: str):
-        if fix_action == "disable_wifi_powersave":
-            self.on_disable_wifi_powersave()
-        elif fix_action == "clear_stale_vpn_routes":
-            self.on_clear_stale_vpn()
-        elif fix_action == "repair_resolv_conf":
-            self.on_repair_resolv_conf()
-        elif fix_action == "open_driver_manager":
-            self.engine.open_driver_manager()
-        elif fix_action == "unblock_rfkill":
-            self.on_unblock_radio()
-        elif fix_action in ("quick_reset", "bounce_interfaces"):
-            self.on_quick_reset()
-        elif fix_action == "restart_network_service":
-            self.on_full_reset()
-        elif fix_action == "set_public_dns":
-            self.stack.set_visible_child_name("dns")
-        elif fix_action == "renew_dhcp":
-            self.on_renew_dhcp()
-        elif fix_action == "open_browser":
-            subprocess.Popen(["xdg-open", "http://connectivity-check.ubuntu.com"])
+        try:
+            if fix_action == "disable_wifi_powersave":
+                self.on_disable_wifi_powersave()
+            elif fix_action == "clear_stale_vpn_routes":
+                self.on_clear_stale_vpn()
+            elif fix_action == "repair_resolv_conf":
+                self.on_repair_resolv_conf()
+            elif fix_action == "open_driver_manager":
+                self.engine.open_driver_manager()
+            elif fix_action == "unblock_rfkill":
+                self.on_unblock_radio()
+            elif fix_action in ("quick_reset", "bounce_interfaces"):
+                self.on_quick_reset()
+            elif fix_action == "restart_network_service":
+                self.on_full_reset()
+            elif fix_action == "set_public_dns":
+                self.stack.set_visible_child_name("dns")
+            elif fix_action == "renew_dhcp":
+                self.on_renew_dhcp()
+            elif fix_action == "open_browser":
+                subprocess.Popen(["xdg-open", "http://connectivity-check.ubuntu.com"])
+        except Exception as e:
+            print(f"Error handling fix action '{fix_action}': {e}", file=sys.stderr)
 
     # -------------------------------------------------------------
     # TAB 2: 1-CLICK FIX & RESET
@@ -375,7 +400,7 @@ class NetDoctorWindow(Gtk.ApplicationWindow):
 
         t_lbl = Gtk.Label(xalign=0)
         t_lbl.get_style_context().add_class("nd-text-primary")
-        t_lbl.set_markup(f"<b>{title}</b>")
+        t_lbl.set_markup(f"<b>{esc(title)}</b>")
         box.pack_start(t_lbl, False, False, 0)
 
         d_lbl = Gtk.Label(label=description, xalign=0)
@@ -394,72 +419,97 @@ class NetDoctorWindow(Gtk.ApplicationWindow):
         return box
 
     def log_message(self, text: str):
-        timestamp = time.strftime("[%H:%M:%S] ")
-        end_iter = self.log_buffer.get_end_iter()
-        self.log_buffer.insert(end_iter, timestamp + text + "\n")
-        self.log_view.scroll_to_iter(self.log_buffer.get_end_iter(), 0.0, False, 0.0, 0.0)
+        try:
+            timestamp = time.strftime("[%H:%M:%S] ")
+            end_iter = self.log_buffer.get_end_iter()
+            self.log_buffer.insert(end_iter, timestamp + str(text) + "\n")
+            self.log_view.scroll_to_iter(self.log_buffer.get_end_iter(), 0.0, False, 0.0, 0.0)
+        except Exception:
+            pass
+        return False
 
     def on_quick_reset(self):
         self.stack.set_visible_child_name("reset")
         self.log_message("Starting Quick Soft Reset...")
         def worker():
-            ok, msg = self.engine.quick_reset()
-            GLib.idle_add(lambda: self.log_message(msg))
-            GLib.idle_add(self.on_run_diagnostics)
+            try:
+                ok, msg = self.engine.quick_reset()
+                GLib.idle_add(self.log_message, msg)
+                GLib.idle_add(self.on_run_diagnostics)
+            except Exception as e:
+                GLib.idle_add(self.log_message, f"✘ Error: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
     def on_full_reset(self):
         self.stack.set_visible_child_name("reset")
         self.log_message("Initiating Full Network Stack Reset (restarting daemons)...")
         def worker():
-            ok, msg = self.engine.full_stack_reset()
-            GLib.idle_add(lambda: self.log_message(msg))
-            GLib.idle_add(self.on_run_diagnostics)
+            try:
+                ok, msg = self.engine.full_stack_reset()
+                GLib.idle_add(self.log_message, msg)
+                GLib.idle_add(self.on_run_diagnostics)
+            except Exception as e:
+                GLib.idle_add(self.log_message, f"✘ Error: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
     def on_disable_wifi_powersave(self):
         self.stack.set_visible_child_name("reset")
         self.log_message("Disabling aggressive Wi-Fi power saving...")
         def worker():
-            ok, msg = self.engine.disable_wifi_powersave()
-            GLib.idle_add(lambda: self.log_message(msg))
-            GLib.idle_add(self.on_run_diagnostics)
+            try:
+                ok, msg = self.engine.disable_wifi_powersave()
+                GLib.idle_add(self.log_message, msg)
+                GLib.idle_add(self.on_run_diagnostics)
+            except Exception as e:
+                GLib.idle_add(self.log_message, f"✘ Error: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
     def on_clear_stale_vpn(self):
         self.stack.set_visible_child_name("reset")
         self.log_message("Clearing stale VPN routes and dead tunnel interfaces...")
         def worker():
-            ok, msg = self.engine.clear_stale_vpn_routes()
-            GLib.idle_add(lambda: self.log_message(msg))
-            GLib.idle_add(self.on_run_diagnostics)
+            try:
+                ok, msg = self.engine.clear_stale_vpn_routes()
+                GLib.idle_add(self.log_message, msg)
+                GLib.idle_add(self.on_run_diagnostics)
+            except Exception as e:
+                GLib.idle_add(self.log_message, f"✘ Error: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
     def on_repair_resolv_conf(self):
         self.stack.set_visible_child_name("reset")
         self.log_message("Repairing /etc/resolv.conf systemd-resolved integration...")
         def worker():
-            ok, msg = self.engine.repair_resolv_conf()
-            GLib.idle_add(lambda: self.log_message(msg))
-            GLib.idle_add(self.on_run_diagnostics)
+            try:
+                ok, msg = self.engine.repair_resolv_conf()
+                GLib.idle_add(self.log_message, msg)
+                GLib.idle_add(self.on_run_diagnostics)
+            except Exception as e:
+                GLib.idle_add(self.log_message, f"✘ Error: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
     def on_unblock_radio(self):
         self.stack.set_visible_child_name("reset")
         self.log_message("Unblocking wireless radios via rfkill...")
         def worker():
-            ok, msg = self.engine.unblock_rfkill()
-            GLib.idle_add(lambda: self.log_message(msg))
-            GLib.idle_add(self.on_run_diagnostics)
+            try:
+                ok, msg = self.engine.unblock_rfkill()
+                GLib.idle_add(self.log_message, msg)
+                GLib.idle_add(self.on_run_diagnostics)
+            except Exception as e:
+                GLib.idle_add(self.log_message, f"✘ Error: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
     def on_renew_dhcp(self):
         self.stack.set_visible_child_name("reset")
         self.log_message("Requesting DHCP lease renewal from router...")
         def worker():
-            ok, msg = self.engine.renew_dhcp()
-            GLib.idle_add(lambda: self.log_message(msg))
-            GLib.idle_add(self.on_run_diagnostics)
+            try:
+                ok, msg = self.engine.renew_dhcp()
+                GLib.idle_add(self.log_message, msg)
+                GLib.idle_add(self.on_run_diagnostics)
+            except Exception as e:
+                GLib.idle_add(self.log_message, f"✘ Error: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
     # -------------------------------------------------------------
@@ -535,7 +585,7 @@ class NetDoctorWindow(Gtk.ApplicationWindow):
 
         t_lbl = Gtk.Label(xalign=0)
         t_lbl.get_style_context().add_class("nd-text-primary")
-        t_lbl.set_markup(f"<b>{title}</b>  <span size='small' alpha='75%'>({ips})</span>")
+        t_lbl.set_markup(f"<b>{esc(title)}</b>  <span size='small' alpha='75%'>({esc(ips)})</span>")
         box.pack_start(t_lbl, False, False, 0)
 
         d_lbl = Gtk.Label(label=description, xalign=0)
@@ -562,9 +612,12 @@ class NetDoctorWindow(Gtk.ApplicationWindow):
         label = ", ".join(dns_list) if dns_list else "Automatic (DHCP)"
         self.log_message(f"Applying DNS configuration ({label})...")
         def worker():
-            ok, msg = self.engine.set_dns_servers("", dns_list)
-            GLib.idle_add(lambda: self.log_message(msg))
-            GLib.idle_add(self.on_run_diagnostics)
+            try:
+                ok, msg = self.engine.set_dns_servers("", dns_list)
+                GLib.idle_add(self.log_message, msg)
+                GLib.idle_add(self.on_run_diagnostics)
+            except Exception as e:
+                GLib.idle_add(self.log_message, f"✘ Error: {e}")
         threading.Thread(target=worker, daemon=True).start()
 
     # -------------------------------------------------------------
@@ -638,104 +691,125 @@ class NetDoctorWindow(Gtk.ApplicationWindow):
         return vbox
 
     def _on_quick_ping_gw(self, button):
-        gw = self.engine.get_default_gateway()
-        if gw:
-            self._set_ping_target(gw)
-        else:
-            self.ping_buffer.set_text("No default gateway detected in routing table.\n")
+        try:
+            gw = self.engine.get_default_gateway()
+            if gw:
+                self._set_ping_target(gw)
+            else:
+                self.ping_buffer.set_text("No default gateway detected in routing table.\n")
+        except Exception as e:
+            self.ping_buffer.set_text(f"Error querying gateway: {e}\n")
 
     def _set_ping_target(self, host):
-        self.ping_entry.set_text(host)
-        if self.ping_process:
+        try:
+            self.ping_entry.set_text(host)
+            if self.ping_process:
+                self.toggle_ping(self.btn_ping)
             self.toggle_ping(self.btn_ping)
-        self.toggle_ping(self.btn_ping)
+        except Exception:
+            pass
 
     def refresh_adapters_info(self):
-        for child in self.ad_container.get_children():
-            self.ad_container.remove(child)
+        try:
+            for child in self.ad_container.get_children():
+                self.ad_container.remove(child)
 
-        rc, out, _ = self.engine.run_cmd(["ip", "-br", "addr", "show"])
-        gw = self.engine.get_default_gateway() or "None"
+            rc, out, _ = self.engine.run_cmd(["ip", "-br", "addr", "show"])
+            gw = self.engine.get_default_gateway() or "None"
 
-        gw_lbl = Gtk.Label(xalign=0)
-        gw_lbl.set_markup(f"<b>Default Gateway:</b> <span color='#0078D4'>{gw}</span>")
-        self.ad_container.pack_start(gw_lbl, False, False, 5)
+            gw_lbl = Gtk.Label(xalign=0)
+            gw_lbl.set_markup(f"<b>Default Gateway:</b> <span color='#0078D4'>{esc(gw)}</span>")
+            self.ad_container.pack_start(gw_lbl, False, False, 5)
 
-        if rc == 0:
-            for line in out.strip().splitlines():
-                parts = line.split()
-                if len(parts) >= 2:
-                    iface = parts[0]
-                    state = parts[1]
-                    ips = " ".join(parts[2:]) if len(parts) > 2 else "No IP"
-                    
-                    card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-                    card.get_style_context().add_class("card")
-                    
-                    header = Gtk.Label(xalign=0)
-                    header.set_markup(f"<span size='large' weight='bold'>{iface}</span>   <span color='#6c757d'>({state})</span>")
-                    card.pack_start(header, False, False, 0)
-                    
-                    ip_lbl = Gtk.Label(label=f"IP Addresses: {ips}", xalign=0)
-                    card.pack_start(ip_lbl, False, False, 0)
-                    
-                    self.ad_container.pack_start(card, False, False, 2)
-        else:
-            err = Gtk.Label(label="Could not query network adapters.", xalign=0)
-            self.ad_container.pack_start(err, False, False, 0)
-            
-        self.ad_container.show_all()
+            if rc == 0:
+                for line in out.strip().splitlines():
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        iface = parts[0]
+                        state = parts[1]
+                        ips = " ".join(parts[2:]) if len(parts) > 2 else "No IP"
+                        
+                        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+                        card.get_style_context().add_class("card")
+                        
+                        header = Gtk.Label(xalign=0)
+                        header.set_markup(f"<span size='large' weight='bold'>{esc(iface)}</span>   <span color='#6c757d'>({esc(state)})</span>")
+                        card.pack_start(header, False, False, 0)
+                        
+                        ip_lbl = Gtk.Label(label=f"IP Addresses: {ips}", xalign=0)
+                        card.pack_start(ip_lbl, False, False, 0)
+                        
+                        self.ad_container.pack_start(card, False, False, 2)
+            else:
+                err = Gtk.Label(label="Could not query network adapters.", xalign=0)
+                self.ad_container.pack_start(err, False, False, 0)
+                
+            self.ad_container.show_all()
+        except Exception as e:
+            print(f"Error refreshing adapters: {e}", file=sys.stderr)
+        return False
 
     def toggle_ping(self, button):
-        if self.ping_process:
-            self.ping_process.terminate()
-            self.ping_process = None
+        try:
+            if self.ping_process:
+                self.ping_process.terminate()
+                self.ping_process = None
+                self.btn_ping.set_label("Start Ping")
+                self.btn_ping.get_style_context().remove_class("destructive-action")
+                self.btn_ping.get_style_context().add_class("suggested-action")
+                self.ping_latency_label.set_markup("<span size='xx-large' weight='bold' color='#0078D4'>-- ms</span>")
+            else:
+                host = self.ping_entry.get_text().strip() or "1.1.1.1"
+                self.ping_buffer.set_text(f"Pinging {host}...\n")
+                self.btn_ping.set_label("Stop Ping")
+                self.btn_ping.get_style_context().remove_class("suggested-action")
+                self.btn_ping.get_style_context().add_class("destructive-action")
+
+                def ping_thread():
+                    try:
+                        self.ping_process = subprocess.Popen(
+                            ["ping", "-i", "1", host],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True
+                        )
+                        for line in iter(self.ping_process.stdout.readline, ''):
+                            if not self.ping_process:
+                                break
+                            GLib.idle_add(self._append_ping_line, line)
+                    except Exception as e:
+                        GLib.idle_add(self._append_ping_line, f"Error: {e}\n")
+                    finally:
+                        GLib.idle_add(self._ping_stopped)
+
+                threading.Thread(target=ping_thread, daemon=True).start()
+        except Exception as e:
+            print(f"Error toggling ping: {e}", file=sys.stderr)
+
+    def _append_ping_line(self, line):
+        try:
+            import re
+            m = re.search(r"time=([\d.]+)\s*ms", line)
+            if m:
+                ms = m.group(1)
+                self.ping_latency_label.set_markup(f"<span size='xx-large' weight='bold' color='#0078D4'>{esc(ms)} ms</span>")
+                
+            end = self.ping_buffer.get_end_iter()
+            self.ping_buffer.insert(end, line)
+            self.ping_view.scroll_to_iter(self.ping_buffer.get_end_iter(), 0.0, False, 0.0, 0.0)
+        except Exception:
+            pass
+        return False
+
+    def _ping_stopped(self):
+        try:
             self.btn_ping.set_label("Start Ping")
             self.btn_ping.get_style_context().remove_class("destructive-action")
             self.btn_ping.get_style_context().add_class("suggested-action")
-            self.ping_latency_label.set_markup("<span size='xx-large' weight='bold' color='#0078D4'>-- ms</span>")
-        else:
-            host = self.ping_entry.get_text().strip() or "1.1.1.1"
-            self.ping_buffer.set_text(f"Pinging {host}...\n")
-            self.btn_ping.set_label("Stop Ping")
-            self.btn_ping.get_style_context().remove_class("suggested-action")
-            self.btn_ping.get_style_context().add_class("destructive-action")
-
-            def ping_thread():
-                try:
-                    self.ping_process = subprocess.Popen(
-                        ["ping", "-i", "1", host],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True
-                    )
-                    for line in iter(self.ping_process.stdout.readline, ''):
-                        if not self.ping_process:
-                            break
-                        GLib.idle_add(self._append_ping_line, line)
-                except Exception as e:
-                    GLib.idle_add(self._append_ping_line, f"Error: {e}\n")
-                finally:
-                    GLib.idle_add(self._ping_stopped)
-
-            threading.Thread(target=ping_thread, daemon=True).start()
-
-    def _append_ping_line(self, line):
-        import re
-        m = re.search(r"time=([\d.]+)\s*ms", line)
-        if m:
-            ms = m.group(1)
-            self.ping_latency_label.set_markup(f"<span size='xx-large' weight='bold' color='#0078D4'>{ms} ms</span>")
-            
-        end = self.ping_buffer.get_end_iter()
-        self.ping_buffer.insert(end, line)
-        self.ping_view.scroll_to_iter(self.ping_buffer.get_end_iter(), 0.0, False, 0.0, 0.0)
-
-    def _ping_stopped(self):
-        self.btn_ping.set_label("Start Ping")
-        self.btn_ping.get_style_context().remove_class("destructive-action")
-        self.btn_ping.get_style_context().add_class("suggested-action")
-        self.ping_process = None
+            self.ping_process = None
+        except Exception:
+            pass
+        return False
 
     def update_status_badge(self, text, style_class, detail):
         self.status_badge.set_text(text)

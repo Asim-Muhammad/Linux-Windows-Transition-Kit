@@ -80,7 +80,10 @@ class ThemeManager:
     def __init__(self):
         self.css_provider = Gtk.CssProvider()
         self._provider_added = False
-        self.css_provider.load_from_data(SYSTEM_ADAPTIVE_CSS)
+        try:
+            self.css_provider.load_from_data(SYSTEM_ADAPTIVE_CSS)
+        except Exception:
+            pass
         self.ensure_provider()
 
     def ensure_provider(self):

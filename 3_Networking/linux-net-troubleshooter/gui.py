@@ -14,6 +14,12 @@ from gi.repository import Gtk, Gdk, GLib, Pango
 
 from engine import NetworkEngine, DiagnosticResult
 
+def esc(text) -> str:
+    """Safely escapes text for use in Pango markup."""
+    if text is None:
+        return ""
+    return GLib.markup_escape_text(str(text))
+
 CSS = b"""
 window {
     background-color: #f7f9fa;
@@ -223,44 +229,59 @@ class TroubleshooterWindow(Gtk.Window):
         return vbox
 
     def on_run_diagnostics(self):
-        self.btn_run_diag.set_sensitive(False)
-        self.spinner.start()
-        self.diag_status_label.set_text("Analyzing network layers (Physical ➜ IP ➜ Gateway ➜ DNS ➜ Web)...")
-        self.update_status_badge("Checking...", "status-blue", "Running diagnostics...")
+        try:
+            self.btn_run_diag.set_sensitive(False)
+            self.spinner.start()
+            self.diag_status_label.set_text("Analyzing network layers (Physical ➜ IP ➜ Gateway ➜ DNS ➜ Web)...")
+            self.update_status_badge("Checking...", "status-blue", "Running diagnostics...")
 
-        # Clear previous items
-        for child in self.results_listbox.get_children():
-            self.results_listbox.remove(child)
+            # Clear previous items
+            for child in self.results_listbox.get_children():
+                self.results_listbox.remove(child)
 
-        def worker():
-            results = self.engine.run_full_diagnostics()
-            GLib.idle_add(self._on_diagnostics_complete, results)
+            def worker():
+                try:
+                    results = self.engine.run_full_diagnostics()
+                    GLib.idle_add(self._on_diagnostics_complete, results)
+                except Exception as e:
+                    print(f"Diagnostics worker exception: {e}", file=sys.stderr)
+                    GLib.idle_add(lambda: self.diag_status_label.set_text(f"Diagnostic error: {e}"))
+                    GLib.idle_add(lambda: self.spinner.stop())
+                    GLib.idle_add(lambda: self.btn_run_diag.set_sensitive(True))
 
-        threading.Thread(target=worker, daemon=True).start()
+            threading.Thread(target=worker, daemon=True).start()
+        except Exception as e:
+            print(f"Error starting diagnostics: {e}", file=sys.stderr)
+        return False
 
     def _on_diagnostics_complete(self, results):
-        self.btn_run_diag.set_sensitive(True)
-        self.spinner.stop()
+        try:
+            self.btn_run_diag.set_sensitive(True)
+            self.spinner.stop()
 
-        has_fail = any(r.status == "FAIL" for r in results)
-        has_warn = any(r.status == "WARN" for r in results)
+            has_fail = any(r.status == "FAIL" for r in results)
+            has_warn = any(r.status == "WARN" for r in results)
 
-        if not has_fail and not has_warn:
-            self.update_status_badge("🟢 Fully Operational", "status-green", "All layers passed! Full internet connectivity verified.")
-            self.diag_status_label.set_text("✔ All 8 network checks passed successfully!")
-        elif not has_fail and has_warn:
-            self.update_status_badge("🟡 Attention Required", "status-yellow", "Connected, but warning detected (e.g. Captive Portal).")
-            self.diag_status_label.set_text("⚠ Network active with warnings.")
-        else:
-            first_fail = next(r for r in results if r.status == "FAIL")
-            self.update_status_badge("🔴 Network Issue", "status-red", f"Failure at: {first_fail.title}")
-            self.diag_status_label.set_text(f"✘ Issue detected: {first_fail.message}")
+            if not has_fail and not has_warn:
+                self.update_status_badge("🟢 Fully Operational", "status-green", "All layers passed! Full internet connectivity verified.")
+                self.diag_status_label.set_text("✔ All 12 network checks passed successfully!")
+            elif not has_fail and has_warn:
+                self.update_status_badge("🟡 Attention Required", "status-yellow", "Connected, but warning detected (e.g. Wi-Fi PowerSave).")
+                self.diag_status_label.set_text("⚠ Network active with warnings.")
+            else:
+                first_fail = next((r for r in results if r.status == "FAIL"), None)
+                if first_fail:
+                    self.update_status_badge("🔴 Network Issue", "status-red", f"Failure at: {first_fail.title}")
+                    self.diag_status_label.set_text(f"✘ Issue detected: {first_fail.message}")
 
-        for res in results:
-            row = self._create_diag_row(res)
-            self.results_listbox.add(row)
+            for res in results:
+                row = self._create_diag_row(res)
+                self.results_listbox.add(row)
 
-        self.results_listbox.show_all()
+            self.results_listbox.show_all()
+        except Exception as e:
+            print(f"Error rendering diagnostics results: {e}", file=sys.stderr)
+        return False
 
     def _create_diag_row(self, res: DiagnosticResult):
         row = Gtk.ListBoxRow()
@@ -278,7 +299,7 @@ class TroubleshooterWindow(Gtk.Window):
             icon = Gtk.Image.new_from_icon_name("process-stop-symbolic", Gtk.IconSize.BUTTON)
 
         title = Gtk.Label(xalign=0)
-        title.set_markup(f"<b>{res.title}</b>")
+        title.set_markup(f"<b>{esc(res.title)}</b>")
         
         status_lbl = Gtk.Label(label=f"[{res.status}]", xalign=1)
         if res.status == "PASS":
@@ -420,7 +441,7 @@ class TroubleshooterWindow(Gtk.Window):
         box.get_style_context().add_class("card")
 
         t_lbl = Gtk.Label(xalign=0)
-        t_lbl.set_markup(f"<b>{title}</b>")
+        t_lbl.set_markup(f"<b>{esc(title)}</b>")
         box.pack_start(t_lbl, False, False, 0)
 
         d_lbl = Gtk.Label(label=description, xalign=0)
@@ -530,7 +551,7 @@ class TroubleshooterWindow(Gtk.Window):
         box.get_style_context().add_class("card")
 
         t_lbl = Gtk.Label(xalign=0)
-        t_lbl.set_markup(f"<b>{title}</b>  <span color='#6c757d'>({ips})</span>")
+        t_lbl.set_markup(f"<b>{esc(title)}</b>  <span color='#6c757d'>({esc(ips)})</span>")
         box.pack_start(t_lbl, False, False, 0)
 
         d_lbl = Gtk.Label(label=description, xalign=0)
@@ -645,7 +666,7 @@ class TroubleshooterWindow(Gtk.Window):
         gw = self.engine.get_default_gateway() or "None"
 
         gw_lbl = Gtk.Label(xalign=0)
-        gw_lbl.set_markup(f"<b>Default Gateway:</b> <span color='#0078D4'>{gw}</span>")
+        gw_lbl.set_markup(f"<b>Default Gateway:</b> <span color='#0078D4'>{esc(gw)}</span>")
         self.ad_container.pack_start(gw_lbl, False, False, 5)
 
         if rc == 0:
@@ -660,7 +681,7 @@ class TroubleshooterWindow(Gtk.Window):
                     card.get_style_context().add_class("card")
                     
                     header = Gtk.Label(xalign=0)
-                    header.set_markup(f"<span size='large' weight='bold'>{iface}</span>   <span color='#6c757d'>({state})</span>")
+                    header.set_markup(f"<span size='large' weight='bold'>{esc(iface)}</span>   <span color='#6c757d'>({esc(state)})</span>")
                     card.pack_start(header, False, False, 0)
                     
                     ip_lbl = Gtk.Label(label=f"IP Addresses: {ips}", xalign=0)

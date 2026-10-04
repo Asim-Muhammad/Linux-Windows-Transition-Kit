@@ -498,7 +498,17 @@ class NetworkEngine:
 
         results = []
         for fn in checks:
-            results.append(fn())
+            try:
+                results.append(fn())
+            except Exception as e:
+                check_name = fn.__name__.replace("check_", "").replace("_", " ").title()
+                results.append(DiagnosticResult(
+                    "probe_error",
+                    f"{check_name} Check",
+                    "WARN",
+                    f"Check encountered an unexpected exception: {e}",
+                    str(e)
+                ))
         return results
 
     # -------------------------------------------------------------
@@ -568,6 +578,9 @@ class NetworkEngine:
     def open_driver_manager(self) -> Tuple[bool, str]:
         """Launches the system's native hardware driver GUI."""
         guis = [
+            "systemsettings kcm_networkmanagement",
+            "kinfocenter",
+            "plasma-discover",
             "software-properties-gtk --open-tab=4",  # Ubuntu Additional Drivers
             "driver-manager",                       # Linux Mint Driver Manager
             "hardinfo",
