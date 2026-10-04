@@ -18,7 +18,7 @@ from netdoctor.engine import NetworkEngine
 class NetDoctorApp(Gtk.Application):
     def __init__(self):
         super().__init__(
-            application_id="org.antigravity.netdoctor",
+            application_id="org.transitionkit.netdoctor",
             flags=Gio.ApplicationFlags.FLAGS_NONE
         )
         self.window = None

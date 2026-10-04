@@ -7,6 +7,7 @@ __pycache__/
 *.o
 *.so
 *.out
+dump_qrc
 .vs/
 build/
 

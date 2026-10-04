@@ -180,7 +180,7 @@ static QString getMimeCommentForPath(const QString& localPath, const QString& ra
 }
 
 static QString getIconNameForPath(const QString& localPath, const QString& rawName, bool isDir) {
-    static const QString iconDir = QStringLiteral("/home/user/.gemini/antigravity/scratch/win10_icons/");
+    static const QString iconDir = QDir::homePath() + QStringLiteral("/.win-explorer/Win10-Explorer-icons/");
     if (isDir) {
         if (rawName == QStringLiteral("This PC")) return QStringLiteral("computer");
         if (rawName == QStringLiteral("Local Disk (C:)")) return QStringLiteral("drive-harddisk-system");
@@ -455,7 +455,7 @@ int main(int argc, char* argv[]) {
     // ------------------------------------------------------------------------
     // Category 7: Text Previewability (isPreviewableTextFile)
     // ------------------------------------------------------------------------
-    QString scratchDir = "/home/user/.gemini/antigravity/scratch/test_qa_sandbox/";
+    QString scratchDir = QDir::tempPath() + QStringLiteral("/test_qa_sandbox/");
     QDir().mkpath(scratchDir);
 
     add("Text Preview", "Plain UTF-8 text file previewable", [scratchDir]() {
